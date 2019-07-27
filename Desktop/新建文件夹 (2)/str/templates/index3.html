@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="/public/js/jquery-1.12.4.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/public/css/indexcss.css">
+    <!--//<script src="/public/js/mygin.js"></script>-->
+    <script type="text/javascript">
+
+        var ws;//websocket实例
+        var lockReconnect = false;//避免重复连接
+        var wsUrl = 'ws://'+{{.IP}}+':'+{{ .PORT }}+'/ping';
+
+        console.log({{.IP}});
+        // console.log("strategy\n",{{.strategy}});
+        // console.log("marginoverride\n",{{.marginoverride}});
+        // console.log("feeoverride\n",{{.feeoverride}});
+        // console.log("strategypnldaily\n",{{.strategypnldaily}});
+        // console.log("strategysymbol\n",{{.strategysymbol}});
+        // console.log("accountinfo\n",{{.accountinfo}});
+        // console.log("accountpnldaily\n",{{.accountpnldaily}});
+        // console.log("symbolinfo\n",{{.symbolinfo}});
+        // console.log("symboltradingperiod\n",{{.symboltradingperiod}});
+
+        function createWebSocket(url) {
+            try {
+                ws = new WebSocket(url);
+                initEventHandle();
+            } catch (e) {
+                reconnect(url);
+            }     
+        }
+
+        function initEventHandle() {
+            ws.onclose = function () {
+                reconnect(wsUrl);
+            };
+            ws.onerror = function () {
+                reconnect(wsUrl);
+            };
+            ws.onopen = function () {
+                //心跳检测重置
+                //{“id”:0, ”op”:”auth”, ”args”:{“user”:”userid”,  “pwd”:”password”} }
+                                     message = {
+                      op:"HeartBeat",
+                      args:{id:1}
+                    }
+
+
+                ws.send(JSON.stringify("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaamessage"));
+                heartCheck.reset().start();
+            };
+            ws.onmessage = function (event) {
+                //如果获取到消息，心跳检测重置
+                //拿到任何消息都说明当前连接是正常的
+                heartCheck.reset().start();
+
+            }
+        }
+
+        function reconnect(url) {
+            if(lockReconnect) return;
+            lockReconnect = true;
+            //没连接上会一直重连，设置延迟避免请求过多
+            setTimeout(function () {
+                createWebSocket(url);
+                lockReconnect = false;
+            }, 2000);
+
+        }
+
+        //心跳检测
+        var heartCheck = {
+            timeout: 6000,//6秒
+            timeoutObj: null,
+            
+
+            reset: function(){
+                clearTimeout(this.timeoutObj);
+                return this;
+            },
+    
+            start: function(){
+                this.timeoutObj = setTimeout(function(){
+                    //这里发送一个心跳，后端收到后，返回一个心跳消息，
+                    //onmessage拿到返回的心跳就说明连接正常
+                    ////心跳格式信息
+                     message = {
+                      op:"HeartBeat",
+                      args:{id:1}
+                    }
+                    ws.send(JSON.stringify(message));
+                }, this.timeout)
+            }
+        }
+        createWebSocket(wsUrl);
+        // setTimeout(function() {
+        //   ws.send(JSON.stringify("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaamessage"));
+        // },5000);
+       
+
+        // 存储策略列表
+        // var strategylist=[];
+
+        // url = 'ws://localhost:'+{{ .PORT }}+'/ping';
+        // strategy_op = new WebSocket(url);
+        ////心跳检测
+        // var heartCheck = {
+        //     timeout: 60000,
+        //     timeoutObj: null,
+        //     reset: function(){
+        //         clearTimeout(this.timeoutObj);
+        //         this.start();
+        //     },
+
+        //     start:function(){
+        //         this.timeoutObj = setTimeout(function(
+        //         strategy_op.send('HeartBeat');
+        //         ){},this.timeout)
+        //     },
+        // };
+
+        // strategy_op.onopen = function(){
+        //     heartCheck.start();
+        // };
+        // strategy_op.onmessage = function(event){
+        //     heartCheck.reset();
+        // };
+
+
+
+
+       //  send = function(data){
+       //      var message = {
+       //           time: new Date(),
+       //           text: "Hello world!",
+       //           clientId: "asdfp8734rew"
+       //      };
+       //  console.log((new Date())+ " ==> "+data);
+       //  strategy_op.send(JSON.stringify(message))
+       // };
+
+       //  strategy_op.onmessage = function(msg){
+       //  //$("#output").append((new Date())+ " <== "+msg.data+"\n")
+       //      console.log( msg.data);
+       //      var data_json=JSON.parse(msg.data);
+
+       //      for(var i=0;i<strategylist.length;i++)
+       //      {
+       //          if(strategylist[i]["strategy_name"]== data_json["strategy_name"])
+       //          {
+
+       //              strategylist[i]["update_time"]=data_json["update_time"];
+       //              strategylist[i]["strategy_status"]=data_json["strategy_status"];
+       //              console.log( strategylist[i]);
+       //              break;
+       //              //strategylist[i]["update_time"]=data_json["update_time"]
+       //          }
+       //      }
+       //  };
+
+       //  strategy_op.onopen = function(){
+       //     setInterval(
+       //     function(){ send("ping") }
+       //     , 1000 )
+       //  };
+       //  function f1() {
+
+
+       //      console.log("-------------------------策略信息表-------------------------");
+       //      for(var i=0;i<strategylist.length;i++)
+       //      {
+       //           console.log(strategylist[i]);
+       //      }
+       //      console.log("------------------------------------------------------------");
+       //  }
+       //  function f2(strategy_name,op,account) {
+       //      strategy_op.send(JSON.stringify({strategy_name:strategy_name,op:op,account:account}))
+       //  }
+       //  function init()
+       //  {
+
+       //      console.log("-------------------------操作指令-------------------------");
+       //      console.log("获取策略信息表: f1()");
+       //      console.log("操作指令: f2(\"止损算法\",\"start\",\"jlzhou\")");
+       //      console.log("----------------------------------------------------------");
+       //      // var strategydata= {{ .strategydata }};
+
+       //      // for(var i=0;i<strategydata.Value.length;i++)
+       //      // {
+       //      //     strategylist.push(strategydata.Value[i]);
+       //      // }
+
+       //  }
+
+       //  $(function () {
+       //      init();
+
+       //  })
+    </script>
+
+</head>
+<body>
+<h3>WebSocket Go</h3>
+    <pre id="output"></pre>
+
+</body>
+</html>
