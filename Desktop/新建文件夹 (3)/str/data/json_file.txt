@@ -1,0 +1,2 @@
+{"Id":1,"Op":"auth","Args":{"User":"myid","Pwd":"123456"}}
+{"Id":1,"Op":"strategy","Args":{"Strategy_id":1,"Strategy_name":"stop","Action":"m_stop","Account":"test"}}

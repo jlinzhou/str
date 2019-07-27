@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="/public/js/jquery-1.12.4.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/public/css/indexcss.css">
+    <script type="text/javascript">
+        //目前这个websocket会自动重连，但不会每隔一段时间发送心跳
+        var ws;//websocket实例
+        var lockReconnect = false;//避免重复连接
+        var wsUrl = 'ws://' + {{.IP }} +':' + {{ .PORT }}+'/ping';
+        var username = {{ .username }};
+        var password = {{ .password }};
+        console.log({{.IP }});
+
+        function createWebSocket(url) {
+            try {
+                ws = new WebSocket(url);
+                initEventHandle();
+            } catch (e) {
+                reconnect(url);
+            }
+        }
+
+        function initEventHandle() {
+            ws.onclose = function () {
+                reconnect(wsUrl);
+            };
+            ws.onerror = function () {
+                reconnect(wsUrl);
+            };
+            ws.onopen = function () {
+                //心跳检测重置
+                //{“id”:0, ”op”:”auth”, ”args”:{“user”:”userid”,  “pwd”:”password”} }
+                message = {
+                    id: 0,
+                    op: "auth",
+                    args: { "user": username, "pwd": password }
+                };
+
+
+                ws.send(JSON.stringify(message));
+                heartCheck.reset().start();
+            };
+            ws.onmessage = function (event) {
+                //如果获取到消息，心跳检测重置
+                //拿到任何消息都说明当前连接是正常的
+                heartCheck.reset().start();
+
+            }
+        }
+
+        function reconnect(url) {
+            if (lockReconnect) return;
+            lockReconnect = true;
+            //没连接上会一直重连，设置延迟避免请求过多
+            setTimeout(function () {
+                createWebSocket(url);
+                lockReconnect = false;
+            }, 2000);
+
+        }
+
+        //心跳检测
+        var heartCheck = {
+            timeout: 6000,//6秒
+            timeoutObj: null,
+
+
+            reset: function () {
+                clearTimeout(this.timeoutObj);
+                return this;
+            },
+
+            start: function () {
+                this.timeoutObj = setTimeout(function () {
+                    //这里发送一个心跳，后端收到后，返回一个心跳消息，
+                    //onmessage拿到返回的心跳就说明连接正常
+                    // ////心跳格式信息
+                    //  message = {
+                    //   op:"HeartBeat",
+                    //   args:{id:1}
+                    // }
+                    // ws.send(JSON.stringify(message));
+                }, this.timeout)
+            }
+        }
+        createWebSocket(wsUrl);
+        ws.onmessage = function (ev) {
+            var edata = ev.data;
+            //console.log(edata);
+            //异常判断，判断万一解析的不是json格式的数据
+            try {
+
+                var object = JSON.parse(edata);
+                console.log(object);
+            }
+            catch (error) {
+                console.log(error);
+            }
+
+        };
+        function createStrategy() {
+            var para = "{\"price\":122.2,\"volume\":13,\"direction\":1}";
+            setTimeout(function () {
+                msg = {
+                    id: 1,
+                    op: "createStrategy",
+                    args: { "nodeId": 1, "symbolInfo": "rb1910", "strategyName": "测试", "strategyArchiveOwner": username, "strategyArchiveName": "number1", "params": para }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+        function startStrategy() {
+            setTimeout(function () {
+                msg = {
+                    id: 1,
+                    op: "startStrategy",
+                    args: { "nodeId": 1, "strategyId": 1 }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+
+        function pauseStrategy() {
+            setTimeout(function () {
+                msg = {
+                    id: 3,
+                    op: "pauseStrategy",
+                    args: { "nodeId": 1, "strategyId": 1 }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+        function deleteStrategy() {
+            setTimeout(function () {
+                msg = {
+                    id: 4,
+                    op: "deleteStrategy",
+                    args: { "nodeId": 1, "strategyId": 1 }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+
+        function modifyStrategy() {
+            var price = Math.round(Math.random() * 1000);
+            var volume = Math.round(Math.random() * 100);
+            var para = "{\"price\":" + String(price) + ",\"volume\":" + String(volume) + ",\"direction\":1}"
+            setTimeout(function () {
+                msg = {
+                    id: 5,
+                    op: "modifyStrategy",
+
+                    args: { "nodeId": 1, "strategyId": 1, "modifySymbol": 0, "params": para }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+        //symbolId  initialMargin   maintenanceMargin
+        function modifyMarginOverride() {
+            setTimeout(function () {
+                msg = {
+                    id: 6,
+                    op: "modifyMarginOverride",
+                    args: { "nodeId": 1, "strategyId": 1, "symbolId": "6A1910", "initialMargin": 40, "maintenanceMargin": 50 }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+        //StrategyId  SymbolId Fee FeeType FeeFormat
+        function modifyFeeOverride() {
+            setTimeout(function () {
+                msg = {
+                    id: 7,
+                    op: "modifyFeeOverride",
+                    args: { "nodeid": 1, "strategyid": 1, "symbolid": "6A1910", "fee": 40.213413, "feetype": "asaa", "feetormat": "ggg" }
+                }
+                ws.send(JSON.stringify(msg))
+            }, 500);
+        }
+
+        function method(mt) {
+            switch (mt) {
+                case 1:
+                    createStrategy();
+                    break;
+                case 2:
+                    startStrategy();
+                    break;
+                case 3:
+                    pauseStrategy();
+                    break;
+                case 4:
+                    deleteStrategy();
+                    break;
+                case 5:
+                    modifyStrategy();
+                    break;
+                case 6:
+                    modifyMarginOverride();
+                    break;
+                case 7:
+                    modifyFeeOverride();
+                    break;
+            }
+        }
+
+        function readme() {
+            var str = `
+            method(1)--createStrategy()
+            method(2)--startStrategy()
+            method(3)--pauseStrategy()
+            method(4)--deleteStrategy()
+            method(5)--modifyStrategy()
+            method(6)--modifyMarginOverride()
+            method(7)--modifyFeeOverride()
+            `;
+            console.log(str);
+        }
+
+
+    </script>
+</head>
+
+<body>
+    <h3>WebSocket Go</h3>
+    <pre id="output"></pre>
+
+</body>
+
+</html>
